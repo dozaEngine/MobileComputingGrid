@@ -31,21 +31,27 @@ public class PrimeNumManager extends NodeThreadManager {
     private String TAG = "PrimeNumManager";
 
     final private long PRIMES100K = 9592;
+    final private long PRIMESHALFMIL = 41538;
+    final private long PRIMES1MIL = 78498;
+    final private long HUNDREDK = 100000;
+    final private long HALFMIL = 500000;
+    final private long ONEMIL = 1000000;
+    private long PRIMES = 0;
 
     private View view;
     private TextView chatLine;
     private ListView listView;
     MessageAdapter adapter = null;
     private List<String> items = new ArrayList<String>();
-    LinkedList<ClusterConnect> clusterNodes = new LinkedList<ClusterConnect>();
+    LinkedList<WorkNodeEntry> clusterNodes = new LinkedList<WorkNodeEntry>();
 
     // TODO: Evaluate properties
     private boolean taskLead = false;
     long timeStart,totalTime;
 
     long primeNumberCount = 0;
-    int finalNum = 100000;
-    int bNum = 0, aNum = 1;
+    private long finalNum = 100000;
+    public int bNum = 0, aNum = 1;
     boolean notSorted = true;
 
     @Override
@@ -66,11 +72,30 @@ public class PrimeNumManager extends NodeThreadManager {
                     public void onClick(View arg0) {
                         Log.d(getTag(), "Send Clicked");
 
+                        if(taskLead && chatLine.getText().toString().equalsIgnoreCase("1MIL"))
+                        {
+                            PRIMES = PRIMES1MIL;
+                            finalNum = ONEMIL;
+                            chatLine.setText("Set to search to One Million.");
+                        }
+                        else if(taskLead && chatLine.getText().toString().equalsIgnoreCase("HALFMIL"))
+                        {
+                            PRIMES = PRIMESHALFMIL;
+                            finalNum = HALFMIL;
+                            chatLine.setText("Set to search to Half Million.");
+                        }
+                        else if(taskLead && chatLine.getText().toString().equalsIgnoreCase("100K"))
+                        {
+                            PRIMES = PRIMES100K;
+                            finalNum = HUNDREDK;
+                            chatLine.setText("Set to search to One Hundred Thousand.");
+                        }
+
                         if(taskLead && clusterNodes.size() != 0) {
                             Log.d(getTag(), "taskLead");
 
                             int totalGens = clusterNodes.size();
-                            int partition = finalNum/(totalGens);
+                            long partition = finalNum/(totalGens);
                             bNum += partition+ (finalNum%totalGens);
 
                             // Load Balance by providing easiest work load
@@ -80,9 +105,11 @@ public class PrimeNumManager extends NodeThreadManager {
                             // Order Nodes by CPU Frequency to Load Balance when scheduling tasks
                             if(notSorted) {
                                 for (int i = 1; i < clusterNodes.size(); i++) {
-                                    ClusterConnect sortNode = clusterNodes.get(i);
+                                    WorkNodeEntry sortNode = clusterNodes.get(i);
                                     int j = i;
-                                    while( j > 0 && (sortNode.nodeProperties.cpuFrequency < clusterNodes.get(j-1).nodeProperties.cpuFrequency)){
+                                    while( j > 0 && (sortNode.getClusterConnect().nodeProperties.cpuFrequency
+                                            < clusterNodes.get(j-1).getClusterConnect().nodeProperties.cpuFrequency)){
+
                                         clusterNodes.set(j,clusterNodes.get(j-1));
                                         j--;
                                     }
@@ -95,17 +122,19 @@ public class PrimeNumManager extends NodeThreadManager {
                             timeStart = System.currentTimeMillis();
                             for (int n = 0; n < clusterNodes.size(); n++) {
 
-                                int cores = clusterNodes.get(n).nodeProperties.processorsAvail;
+                                int cores = clusterNodes.get(n).getClusterConnect().nodeProperties.processorsAvail;
 
                                 //Packaged Task
                                 Generator generator = new Generator(aNum, bNum);
+                                clusterNodes.get(n).setGenerator(generator);
+                                clusterNodes.get(n).setTaskComplete(false);
 
                                 // Send Task
-                                clusterNodes.get(n).write(generator);
+                                clusterNodes.get(n).getClusterConnect().write(generator);
 
                                 // TODO: Remove: Using for Debug
                                 // Increase Search Floor - prevent from using previously used node
-                                cpuFreq = clusterNodes.get(n).nodeProperties.cpuFrequency;
+                                cpuFreq = clusterNodes.get(n).getClusterConnect().nodeProperties.cpuFrequency;
                                 pushMessage(chatLine.getText().toString() + "\n" +
                                         " Node KHz:"+cpuFreq+" Cores:"+cores+" Search Range> Init: " + aNum + " Final: " + bNum);
                                 chatLine.setText("");
@@ -118,6 +147,11 @@ public class PrimeNumManager extends NodeThreadManager {
                             /* Reset */
                             aNum = 1;
                             bNum = 0;
+
+                            /**
+                             *  Start task monitor
+                             * */
+
 
                         }else if (clusterConnect != null) {
                             Log.d(getTag(), "peer");
@@ -150,17 +184,41 @@ public class PrimeNumManager extends NodeThreadManager {
         this.taskLead = on;
     }
 
+    public void updateHeartbeat(int hash)
+    {
+        for(int n = 0; n < clusterNodes.size(); n++)
+        {
+            // find node and update time
+            if(clusterNodes.get(n).getClusterConnect().nodeProperties.hash == hash)
+            {
+                clusterNodes.get(n).setHeartbeatTime(System.currentTimeMillis());
+                return;
+            }
+        }
+    }
+
     public boolean checkComplete()
     {
-        if(PRIMES100K <= primeNumberCount)
+        if(PRIMES <= primeNumberCount)
         {
             primeNumberCount = 0;
+
+            for(int n = 0; n < clusterNodes.size(); n++)
+            {
+                // find node and update time
+                clusterNodes.get(n).setTaskComplete(true);
+            }
+
+            /**
+             * Stop task monitor
+             * */
+
             return true;
         }
         return false;
     }
 
-    public void computationComplete(){
+    public void nodeComputationComplete(){
         totalTime = System.currentTimeMillis() - timeStart;
         pushMessage("Total Time: " + String.valueOf(totalTime));
     }
@@ -170,7 +228,7 @@ public class PrimeNumManager extends NodeThreadManager {
         if (obj != null) {
             clusterConnect = obj;
             if(taskLead) {
-                clusterNodes.add(obj);
+                clusterNodes.add(new WorkNodeEntry(obj,System.currentTimeMillis()));
                 notSorted = true;
             }else{
                 this.startHeartbeat();
@@ -189,7 +247,7 @@ public class PrimeNumManager extends NodeThreadManager {
     // TODO: Run in thread
     //run the generator in a thread
     public void thread(Generator generator){
-        if(generator != null) {
+        if(!taskLead && generator != null) {
             if(!multithreaded) {
                 generator.generatePrimes();
                 clusterConnect.write(generator);
@@ -197,12 +255,13 @@ public class PrimeNumManager extends NodeThreadManager {
             }
             else{
                 int cores = clusterConnect.nodeProperties.processorsAvail;
+                aNum = generator.readMin();
+                bNum = generator.readMax();
                 int partition = (generator.readMax() - generator.readMin()) / cores;
                 int numA = generator.readMin();
                 int numB = numA + partition;
 
                 for (int t = 0; t < cores; t++) {
-
                     GeneratorCrank generatorCrank = new GeneratorCrank(new Generator(numA, numB));
 
                     //Use API to queue work
@@ -273,9 +332,57 @@ public class PrimeNumManager extends NodeThreadManager {
 
         @Override
         public void run() {
-                generator.generatePrimes();
-                if(multithreaded) sendComplete(generator);
-                else clusterConnect.write(generator);
+            generator.generatePrimes();
+            if(multithreaded) sendComplete(generator);
+            else clusterConnect.write(generator);
+        }
+    }
+
+    private class WorkNodeEntry{
+        private ClusterConnect clusterConnect;
+        private long lastHeartbeat;
+        private Generator generator;
+        private boolean taskComplete = false;
+
+        public WorkNodeEntry(ClusterConnect _clusterConnect, long _time)
+        {
+            clusterConnect = _clusterConnect;
+            lastHeartbeat = _time;
+        }
+
+        public ClusterConnect getClusterConnect() {
+            return clusterConnect;
+        }
+
+        public long getLastHeartbeat() {
+            return lastHeartbeat;
+        }
+
+        public void setHeartbeatTime(long lastHeartbeat) {
+            this.lastHeartbeat = lastHeartbeat;
+        }
+
+        public boolean compare(Generator _generator) {
+            if(generator == null || _generator == null) return false;
+
+            if((generator.readMin() == _generator.readMin())&&
+               (generator.readMax() == _generator.readMax() ))
+                return true;
+            else
+                return false;
+
+        }
+
+        public void setGenerator(Generator generator) {
+            this.generator = generator;
+        }
+
+        public boolean isTaskComplete() {
+            return taskComplete;
+        }
+
+        public void setTaskComplete(boolean taskComplete) {
+            this.taskComplete = taskComplete;
         }
     }
 }

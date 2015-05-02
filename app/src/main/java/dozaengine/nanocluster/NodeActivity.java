@@ -51,7 +51,7 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
 
                     (primeNumManager).pushMessage("Prime Numbers Identified: " + String.valueOf(TotalPrimeNumCount));
                     (primeNumManager).pushMessage("Computation Time: " + String.valueOf(TotalComputationTime));
-                    primeNumManager.computationComplete();
+                    primeNumManager.nodeComputationComplete();
 
                     if(primeNumManager.checkComplete())
                         primeNumManager.pushMessage("---- All Prime Numbers Found ----");
@@ -82,10 +82,11 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
                 Log.d(TAG,"Message Complete Task");
                 if(!groupOwner)
                 {
+                    // Consolidate Results in Client
                     ++numberOfTasks;
                     TotalPrimeNumCount += ((Generator) msg.obj).readPrimeCount();
                     if(numberOfTasks >= numberOfCores){
-                        Generator result = new Generator(0,0);
+                        Generator result = new Generator(primeNumManager.aNum,primeNumManager.bNum);
                         result.setPrimes(TotalPrimeNumCount);
                         primeNumManager.sendClusterComplete(result);
                         numberOfTasks = 0;
@@ -93,12 +94,13 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
                     }
                 }
                 break;
-
             case HEARTBEAT:
                 if(groupOwner)
                 {
                     (primeNumManager).pushMessage("Heartbeat Received: " + ((NodeProperties)msg.obj).hash);
+                    (primeNumManager).updateHeartbeat(((NodeProperties)msg.obj).hash);
                 }
+                break;
             default:
                 /*
                  * Pass along other messages from the UI

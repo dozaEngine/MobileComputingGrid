@@ -106,16 +106,9 @@ public class ClusterConnect implements Runnable  {
 
     /* Serialized Implementation */
     public void write(Object obj) {
-//        byte[] buffer;
-//        try {
             Log.e(TAG, "About to write to queue.");
             taskManager.scheduleObj(obj);
             Log.e(TAG, "Completed writing to queue.");
-//            buffer = serializer.serialize(obj);
-//            oStream.write(buffer);
-//        } catch (IOException e) {
-//            Log.e(TAG, "Exception during write", e);
-//        }
     }
 
     /* Byte Stream Implementation */
