@@ -15,10 +15,6 @@ public class TaskManager {
 
     String TAG = "TaskManager";
 
-    static final int READY = 0;
-    static final int BUSY = 0;
-    static final int COMPLETE = 0;
-
     /* Application Handler */
     Handler handle;
     /* Network Interface */
@@ -28,23 +24,26 @@ public class TaskManager {
     private Serializer serializer = new Serializer();
 
     /* FIFO Queue */
-    private LinkedBlockingDeque<Object> workQ;
+    private LinkedBlockingDeque<Object> sendQ;
     private LinkedBlockingDeque<Object> completeQ;
+    private LinkedBlockingDeque<Object> heartbeatQ;
 
     public TaskManager(Handler handle, OutputStream stream) {
-        workQ = new LinkedBlockingDeque<Object>();
+        sendQ = new LinkedBlockingDeque<Object>();
         completeQ = new LinkedBlockingDeque<Object>();
+        heartbeatQ = new LinkedBlockingDeque<Object>();
         this.handle = handle;
         this.oStream = stream;
 
         new Thread(new ObjectReceiver()).start();
         new Thread(new ObjectScheduler()).start();
+        new Thread(new HeartbeatReceiver()).start();
     }
 
     void scheduleObj(Object obj) {
         Log.d(TAG, "scheduleObj Entry >>>");
         try {
-            workQ.put(obj);
+            sendQ.put(obj);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -60,12 +59,18 @@ public class TaskManager {
             e.printStackTrace();
         }
         Log.d(TAG, "completedObj Exit <<<");
-
     }
 
-    void setTaskReady(){}
-    void setTaskBusy(){}
-    void setTaskComplete(){}
+    void heartbeatObj(Object obj){
+        Log.d(TAG, "completedObj Entry >>>");
+
+        try {
+            heartbeatQ.put(obj);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        Log.d(TAG, "completedObj Exit <<<");
+    }
 
     private class ObjectScheduler implements Runnable{
         Object object;
@@ -76,7 +81,7 @@ public class TaskManager {
             while(true) {
                 try {
                     Log.e(TAG, "ObjectScheduler Take ...");
-                    object = workQ.take();
+                    object = sendQ.take();
                     Log.e(TAG, "ObjectScheduler Take Complete...");
                     buffer = serializer.serialize(object);
                     oStream.write(buffer);
@@ -88,6 +93,8 @@ public class TaskManager {
             }
         }
     }
+
+
 
     private class ObjectReceiver implements Runnable{
         Object object;
@@ -106,5 +113,24 @@ public class TaskManager {
             }
         }
     }
+
+    private class HeartbeatReceiver implements Runnable{
+        Object object;
+        @Override
+        public void run() {
+            while(true) {
+                try {
+                    Log.e(TAG, "HeartbeatReceiver Take Start...");
+                    object = heartbeatQ.take();
+                    Log.e(TAG, "HeartbeatReceiver Take Complete...");
+                    handle.obtainMessage(WiFiServiceDiscoveryActivity.HEARTBEAT,
+                            object).sendToTarget();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
 
 }

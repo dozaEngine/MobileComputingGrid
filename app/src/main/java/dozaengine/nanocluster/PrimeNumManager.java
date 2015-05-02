@@ -18,17 +18,21 @@ import java.util.List;
 
 
 import clusterapi.ClusterConnect;
+import clusterapi.NodeThreadManager;
 
 /**
  * This fragment handles chat related UI which includes a list view for messages
  * and a message entry field with send button.
  */
-public class PrimeNumManager extends Fragment {
+public class PrimeNumManager extends NodeThreadManager {
+
+    private boolean multithreaded = true;
 
     private String TAG = "PrimeNumManager";
 
+    final private long PRIMES100K = 9592;
+
     private View view;
-    private static ClusterConnect primeNumGenConnect;
     private TextView chatLine;
     private ListView listView;
     MessageAdapter adapter = null;
@@ -39,6 +43,7 @@ public class PrimeNumManager extends Fragment {
     private boolean taskLead = false;
     long timeStart,totalTime;
 
+    long primeNumberCount = 0;
     int finalNum = 100000;
     int bNum = 0, aNum = 1;
     boolean notSorted = true;
@@ -64,8 +69,9 @@ public class PrimeNumManager extends Fragment {
                         if(taskLead && clusterNodes.size() != 0) {
                             Log.d(getTag(), "taskLead");
 
-                            int partition = finalNum/clusterNodes.size();
-                            bNum += partition+ (finalNum%clusterNodes.size());
+                            int totalGens = clusterNodes.size();
+                            int partition = finalNum/(totalGens);
+                            bNum += partition+ (finalNum%totalGens);
 
                             // Load Balance by providing easiest work load
                             // to lowers frequency processor
@@ -85,38 +91,50 @@ public class PrimeNumManager extends Fragment {
                                 notSorted = false;
                             }
 
-
                             // TODO: Create Active Work Queue
                             timeStart = System.currentTimeMillis();
-                            for (int i = 0; i < clusterNodes.size(); i++) {
+                            for (int n = 0; n < clusterNodes.size(); n++) {
+
+                                int cores = clusterNodes.get(n).nodeProperties.processorsAvail;
 
                                 //Packaged Task
                                 Generator generator = new Generator(aNum, bNum);
 
-                                // Increase Search Floor - prevent from using previously used node
-                                cpuFreq = clusterNodes.get(i).nodeProperties.cpuFrequency;
-
                                 // Send Task
-                                clusterNodes.get(i).write(generator);
+                                clusterNodes.get(n).write(generator);
 
                                 // TODO: Remove: Using for Debug
+                                // Increase Search Floor - prevent from using previously used node
+                                cpuFreq = clusterNodes.get(n).nodeProperties.cpuFrequency;
                                 pushMessage(chatLine.getText().toString() + "\n" +
-                                        " Node KHz:"+cpuFreq+" Search Range> Init: " + aNum + " Final: " + bNum);
+                                        " Node KHz:"+cpuFreq+" Cores:"+cores+" Search Range> Init: " + aNum + " Final: " + bNum);
                                 chatLine.setText("");
                                 chatLine.clearFocus();
 
-                                aNum = bNum+1;
-                                bNum +=partition;
+                                aNum = bNum + 1;
+                                bNum += partition;
                             }
 
                             /* Reset */
                             aNum = 1;
                             bNum = 0;
 
-                        }else if (primeNumGenConnect != null) {
+                        }else if (clusterConnect != null) {
                             Log.d(getTag(), "peer");
 
                             // TODO: Remove: Using for Debug
+                            if(chatLine.getText().toString().equalsIgnoreCase("single"))
+                            {
+                                multithreaded = false;
+                                chatLine.setText("Set to Single Threaded.");
+                            }
+                            else if(chatLine.getText().toString().equalsIgnoreCase("multi"))
+                            {
+                                multithreaded = true;
+                                chatLine.setText("Set to Multi Threaded.");
+                            }
+                            else multithreaded = false;
+
                             pushMessage(chatLine.getText().toString() + "\n" +
                                         " Waiting on task... ");
                             chatLine.setText("");
@@ -132,6 +150,16 @@ public class PrimeNumManager extends Fragment {
         this.taskLead = on;
     }
 
+    public boolean checkComplete()
+    {
+        if(PRIMES100K <= primeNumberCount)
+        {
+            primeNumberCount = 0;
+            return true;
+        }
+        return false;
+    }
+
     public void computationComplete(){
         totalTime = System.currentTimeMillis() - timeStart;
         pushMessage("Total Time: " + String.valueOf(totalTime));
@@ -140,13 +168,12 @@ public class PrimeNumManager extends Fragment {
     public void setConnection(ClusterConnect obj) {
         Log.d(TAG,"Setting Connection");
         if (obj != null) {
-            primeNumGenConnect = obj;
+            clusterConnect = obj;
             if(taskLead) {
                 clusterNodes.add(obj);
                 notSorted = true;
             }else{
-                obj.write(obj.nodeProperties);
-                Log.e(TAG,"Client Sent Node Properties!");
+                this.startHeartbeat();
             }
         }else
             Log.d(TAG, "Object Null");
@@ -163,11 +190,28 @@ public class PrimeNumManager extends Fragment {
     //run the generator in a thread
     public void thread(Generator generator){
         if(generator != null) {
-            generator.generatePrimes();
-            primeNumGenConnect.write(generator);
-            pushMessage("Computation Completed in " + String.valueOf(generator.readCompTime()) + "ms!");
-//        GeneratorCrank generatorCrank = new GeneratorCrank(generator);
-//        new Thread(generatorCrank);
+            if(!multithreaded) {
+                generator.generatePrimes();
+                clusterConnect.write(generator);
+                pushMessage("Computation Completed in " + String.valueOf(generator.readCompTime()) + "ms!");
+            }
+            else{
+                int cores = clusterConnect.nodeProperties.processorsAvail;
+                int partition = (generator.readMax() - generator.readMin()) / cores;
+                int numA = generator.readMin();
+                int numB = numA + partition;
+
+                for (int t = 0; t < cores; t++) {
+
+                    GeneratorCrank generatorCrank = new GeneratorCrank(new Generator(numA, numB));
+
+                    //Use API to queue work
+                    this.loadWork(generatorCrank);
+
+                    numA = numB + 1;
+                    numB += partition;
+                }
+            }
         }
     }
 
@@ -230,8 +274,8 @@ public class PrimeNumManager extends Fragment {
         @Override
         public void run() {
                 generator.generatePrimes();
-                primeNumGenConnect.write(generator);
-                pushMessage("Computation Completed in " + String.valueOf(generator.readCompTime()) + "ms!");
+                if(multithreaded) sendComplete(generator);
+                else clusterConnect.write(generator);
         }
     }
 }

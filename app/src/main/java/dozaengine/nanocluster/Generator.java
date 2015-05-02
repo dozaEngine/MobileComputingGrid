@@ -65,6 +65,16 @@ public class Generator implements Serializable {
         }
     }
 
+    public int readMax()
+    {
+        return max;
+    }
+
+    public int readMin()
+    {
+        return min;
+    }
+
     public int readPrimeCount(){
         return count;
     }
@@ -72,5 +82,7 @@ public class Generator implements Serializable {
     public long readCompTime(){
         return compTime;
     }
+
+    public void setPrimes(long _primes) {count = (int)_primes;}
 
 }

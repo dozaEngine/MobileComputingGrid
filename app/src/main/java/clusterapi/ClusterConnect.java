@@ -54,8 +54,12 @@ public class ClusterConnect implements Runnable  {
             int bytes;
 
             Log.d(TAG,"Sending Handle");
-            if(nodeProperties != null)
-                Log.d(TAG,"CPU Freq:" + nodeProperties.cpuFrequency);
+            if(nodeProperties != null) {
+                Log.e(TAG, "Heartbeat Received: " + nodeProperties.hash);
+                Log.d(TAG, "CPU Freq:" + nodeProperties.cpuFrequency);
+                Log.d(TAG, "Cores:" + nodeProperties.processorsAvail);
+            }
+
             handler.obtainMessage(WiFiServiceDiscoveryActivity.MY_HANDLE, this)
                     .sendToTarget();
 
@@ -72,17 +76,18 @@ public class ClusterConnect implements Runnable  {
 
                     // Expected to be received as first message
                     if(object.getClass() == NodeProperties.class){
-                        Log.e(TAG, "Received Node Properties!!!! Yeah!");
-                        nodeProperties = (NodeProperties)object;
+                        if(nodeProperties == null) nodeProperties = (NodeProperties)object;
+                        Log.e(TAG, "Heartbeat Received: " + nodeProperties.hash);
                         Log.e(TAG, "CPU Freq:" + String.valueOf(nodeProperties.cpuFrequency));
-                        continue;
+                        Log.e(TAG, "Cores:" + String.valueOf(nodeProperties.processorsAvail));
+                        taskManager.heartbeatObj(object);
+                    }
+                    else {
+                        // Send the obtained bytes to the UI Activity
+                        Log.d(TAG, "Rec["+buffer.length+"]: "+ String.valueOf(buffer.hashCode()));
+                        taskManager.completedObj(object);
                     }
 
-                    // Send the obtained bytes to the UI Activity
-                    Log.d(TAG, "Rec:" + String.valueOf(buffer));
-                    taskManager.completedObj(object);
-//                    handler.obtainMessage(WiFiServiceDiscoveryActivity.MESSAGE_READ,
-//                            object).sendToTarget();
                 } catch (ClassNotFoundException e) {
                     e.printStackTrace();
                 }

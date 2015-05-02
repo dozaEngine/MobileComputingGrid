@@ -30,10 +30,12 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import dozaengine.nanocluster.R;
 
@@ -59,6 +61,8 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
 
     public static final int MESSAGE_READ = 0x400 + 1;
     public static final int MY_HANDLE = 0x400 + 2;
+    public static final int CLIENT_TASK_COMPLETE = 0x400 + 3;
+    public static final int HEARTBEAT = 0x400 + 4;
     private WifiP2pManager manager;
 
     static final int SERVER_PORT = 4545;
@@ -68,7 +72,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
     private BroadcastReceiver receiver = null;
     private WifiP2pDnsSdServiceRequest serviceRequest;
 
-    private Handler handler = new Handler(this);
+    public Handler handler = new Handler(this);
     private static Thread socketThread = null;
 
     // Node Properties
@@ -80,6 +84,13 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
     private boolean retryChannel = false;
 
     private WiFiDirectServicesList servicesList;
+
+    /**
+     * Gets the number of cores available in this device, across all processors.
+     * Requires: Ability to peruse the filesystem at "/sys/devices/system/cpu"
+     * @return The number of cores, or 1 if failed to get result
+     */
+    private int getNumCores() { return Runtime.getRuntime().availableProcessors(); }
 
     /** Called when the activity is first created. */
     @Override
@@ -101,8 +112,8 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
         String strCpuFreq = getFreqInfo();
         Log.d(TAG, "CPU Freq String:" + strCpuFreq);
         int maxCpuFreq = Integer.parseInt(strCpuFreq.trim());
-        nodeProperties = new NodeProperties(maxCpuFreq,1,batteryLife);
-
+        nodeProperties = new NodeProperties(maxCpuFreq,getNumCores(),batteryLife);
+        nodeProperties.setHash(((Object)nodeProperties).hashCode());
 
         manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         channel = manager.initialize(this, getMainLooper(), null);

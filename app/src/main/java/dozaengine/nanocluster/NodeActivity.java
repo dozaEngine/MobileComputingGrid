@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.TextView;
 
 import clusterapi.ClusterConnect;
+import clusterapi.NodeProperties;
 import clusterapi.WiFiServiceDiscoveryActivity;
 
 /**
@@ -18,9 +19,12 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
     private PrimeNumManager primeNumManager;
 
     private TextView statusTxtView;
+    private static long numberOfTasks = 0;
+    private static long numberOfCores = 0;
+    private static long cpuFrequency = 0;
 
     //TODO: Evaluate the following properties
-    private static int TotalPrimeNumCount = 0;
+    private static long TotalPrimeNumCount = 0;
     private static float TotalComputationTime = 0.0f;
 
     @Override
@@ -37,23 +41,25 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
             case MESSAGE_READ:
                 Generator generator = (Generator) msg.obj;
                 if(groupOwner) {
-
+                    if(primeNumManager != null) {
                     Log.d(TAG, "Received Results");
-                    TotalPrimeNumCount += generator.readPrimeCount();
+                    primeNumManager.primeNumberCount += generator.readPrimeCount();
+                    TotalPrimeNumCount = primeNumManager.primeNumberCount;
                     TotalComputationTime = generator.readCompTime();
-                    Log.d(TAG, "Prime Numbers Identified: " + String.valueOf(TotalPrimeNumCount));
+                    Log.d(TAG, "Prime Numbers Identified: " + String.valueOf(primeNumManager.primeNumberCount));
                     Log.d(TAG, "Computation Time: " + String.valueOf(TotalComputationTime));
 
-                    if(primeNumManager != null) {
-                        (primeNumManager).pushMessage("Prime Numbers Identified: " + String.valueOf(TotalPrimeNumCount));
-                        (primeNumManager).pushMessage("Computation Time: " + String.valueOf(TotalComputationTime));
-                        primeNumManager.computationComplete();
+                    (primeNumManager).pushMessage("Prime Numbers Identified: " + String.valueOf(TotalPrimeNumCount));
+                    (primeNumManager).pushMessage("Computation Time: " + String.valueOf(TotalComputationTime));
+                    primeNumManager.computationComplete();
+
+                    if(primeNumManager.checkComplete())
+                        primeNumManager.pushMessage("---- All Prime Numbers Found ----");
+
                     }else Log.d(TAG, "PrimeNumManager is NULL");
                 }else{
-
                     Log.d(TAG, "Received Object for Processing");
                     if(primeNumManager != null) {
-                        // TODO: Thread to Generate Primes
                         (primeNumManager).pushMessage("Computation In Progress..");
                         (primeNumManager).thread(generator);
                     }else Log.d(TAG, "PrimeNumManager is NULL");
@@ -63,9 +69,41 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
             case MY_HANDLE:
                 Log.d(TAG,"Setting Handle");
                 Object obj = msg.obj;
-                if(((ClusterConnect)obj).nodeProperties != null)
-                    Log.d(TAG,"CPU Freq:" + ((ClusterConnect)obj).nodeProperties.cpuFrequency);
+                if(((ClusterConnect)obj).nodeProperties != null) {
+                    Log.d(TAG, "CPU Freq:" + ((ClusterConnect) obj).nodeProperties.cpuFrequency);
+                    Log.d(TAG, "Cores:" + ((ClusterConnect) obj).nodeProperties.processorsAvail);
+                    numberOfCores = ((ClusterConnect) obj).nodeProperties.processorsAvail;
+                    cpuFrequency = ((ClusterConnect) obj).nodeProperties.cpuFrequency;
+                }
                 (primeNumManager).setConnection((ClusterConnect) obj);
+                primeNumManager.setHandler(this.handler);
+                break;
+            case CLIENT_TASK_COMPLETE:
+                Log.d(TAG,"Message Complete Task");
+                if(!groupOwner)
+                {
+                    ++numberOfTasks;
+                    TotalPrimeNumCount += ((Generator) msg.obj).readPrimeCount();
+                    if(numberOfTasks >= numberOfCores){
+                        Generator result = new Generator(0,0);
+                        result.setPrimes(TotalPrimeNumCount);
+                        primeNumManager.sendClusterComplete(result);
+                        numberOfTasks = 0;
+                        TotalPrimeNumCount = 0;
+                    }
+                }
+                break;
+
+            case HEARTBEAT:
+                if(groupOwner)
+                {
+                    (primeNumManager).pushMessage("Heartbeat Received: " + ((NodeProperties)msg.obj).hash);
+                }
+            default:
+                /*
+                 * Pass along other messages from the UI
+                 */
+                super.handleMessage(msg);
         }
         return true;
     }
