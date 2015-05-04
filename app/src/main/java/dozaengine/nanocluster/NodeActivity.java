@@ -53,6 +53,13 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
                     (primeNumManager).pushMessage("Computation Time: " + String.valueOf(TotalComputationTime));
                     primeNumManager.nodeComputationComplete();
 
+                    // Set Node Complete
+                    for(int n = 0; n < primeNumManager.clusterNodes.size(); n++)
+                    {
+                        if(primeNumManager.clusterNodes.get(n).compare(generator))
+                            primeNumManager.clusterNodes.get(n).setTaskComplete(true);
+                    }
+
                     if(primeNumManager.checkComplete())
                         primeNumManager.pushMessage("---- All Prime Numbers Found ----");
 
@@ -97,7 +104,6 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
             case HEARTBEAT:
                 if(groupOwner)
                 {
-                    (primeNumManager).pushMessage("Heartbeat Received: " + ((NodeProperties)msg.obj).hash);
                     (primeNumManager).updateHeartbeat(((NodeProperties)msg.obj).hash);
                 }
                 break;

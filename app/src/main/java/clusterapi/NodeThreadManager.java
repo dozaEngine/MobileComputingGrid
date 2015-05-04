@@ -22,6 +22,8 @@ public class NodeThreadManager extends Fragment {
     // Sets the Time Unit to seconds
     private static final TimeUnit KEEP_ALIVE_TIME_UNIT = TimeUnit.SECONDS;
 
+    public final int HEARTBEAT_TO = 1500; // 1.5 seconds
+
     public Handler handle = null;
 
     // A queue of Runnables
@@ -67,7 +69,7 @@ public class NodeThreadManager extends Fragment {
     public void startHeartbeat()
     {
         Log.e("NodeThreadManager"," >>> Starting Heartbeat <<<");
-        (new Heartbeat(clusterConnect)).execute(1000); // TODO - make dynamic setting
+        (new Heartbeat(clusterConnect)).execute(100000); // TODO - make dynamic setting
     }
 
     private class Heartbeat extends AsyncTask<Integer, Integer, Long> {

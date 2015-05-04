@@ -3,6 +3,7 @@ package dozaengine.nanocluster;
 
 import android.app.Fragment;
 import android.content.Context;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -19,6 +20,7 @@ import java.util.List;
 
 import clusterapi.ClusterConnect;
 import clusterapi.NodeThreadManager;
+import clusterapi.TaskManager;
 
 /**
  * This fragment handles chat related UI which includes a list view for messages
@@ -27,6 +29,7 @@ import clusterapi.NodeThreadManager;
 public class PrimeNumManager extends NodeThreadManager {
 
     private boolean multithreaded = true;
+    private boolean taskComplete = true;
 
     private String TAG = "PrimeNumManager";
 
@@ -36,14 +39,14 @@ public class PrimeNumManager extends NodeThreadManager {
     final private long HUNDREDK = 100000;
     final private long HALFMIL = 500000;
     final private long ONEMIL = 1000000;
-    private long PRIMES = 0;
+    private long PRIMES = PRIMES100K;
 
     private View view;
     private TextView chatLine;
     private ListView listView;
     MessageAdapter adapter = null;
     private List<String> items = new ArrayList<String>();
-    LinkedList<WorkNodeEntry> clusterNodes = new LinkedList<WorkNodeEntry>();
+    public LinkedList<WorkNodeEntry> clusterNodes = new LinkedList<WorkNodeEntry>();
 
     // TODO: Evaluate properties
     private boolean taskLead = false;
@@ -91,10 +94,15 @@ public class PrimeNumManager extends NodeThreadManager {
                             chatLine.setText("Set to search to One Hundred Thousand.");
                         }
 
-                        if(taskLead && clusterNodes.size() != 0) {
+                        if(taskLead) {
                             Log.d(getTag(), "taskLead");
 
                             int totalGens = clusterNodes.size();
+                            if(totalGens == 0)
+                            {
+                                Log.e("PrimeNumManager", "ERROR: No Cluster nodes available");
+                                return;
+                            }
                             long partition = finalNum/(totalGens);
                             bNum += partition+ (finalNum%totalGens);
 
@@ -151,7 +159,8 @@ public class PrimeNumManager extends NodeThreadManager {
                             /**
                              *  Start task monitor
                              * */
-
+                            Log.e("PrimeNumManager", "Starting Task Monitor");
+                            new Thread(new TaskMonitor()).start();
 
                         }else if (clusterConnect != null) {
                             Log.d(getTag(), "peer");
@@ -191,6 +200,7 @@ public class PrimeNumManager extends NodeThreadManager {
             // find node and update time
             if(clusterNodes.get(n).getClusterConnect().nodeProperties.hash == hash)
             {
+                Log.d("Heartbeat","Updated Heartbeat: " + hash);
                 clusterNodes.get(n).setHeartbeatTime(System.currentTimeMillis());
                 return;
             }
@@ -207,11 +217,8 @@ public class PrimeNumManager extends NodeThreadManager {
             {
                 // find node and update time
                 clusterNodes.get(n).setTaskComplete(true);
+                taskComplete = true;
             }
-
-            /**
-             * Stop task monitor
-             * */
 
             return true;
         }
@@ -338,7 +345,8 @@ public class PrimeNumManager extends NodeThreadManager {
         }
     }
 
-    private class WorkNodeEntry{
+    // TODO - Move to API
+    public class WorkNodeEntry{
         private ClusterConnect clusterConnect;
         private long lastHeartbeat;
         private Generator generator;
@@ -383,6 +391,60 @@ public class PrimeNumManager extends NodeThreadManager {
 
         public void setTaskComplete(boolean taskComplete) {
             this.taskComplete = taskComplete;
+        }
+    }
+
+    // TODO - Move to API
+    private class TaskMonitor implements Runnable {
+
+        @Override
+        public void run() {
+            // Run Until Cancelled
+            taskComplete = false;
+            do {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    break;
+                }
+
+                if(taskComplete) break;
+                if(clusterNodes == null) break;
+
+                for (int n =0; n < clusterNodes.size(); n++)
+                {
+                    long hb = clusterNodes.get(n).getLastHeartbeat();
+                    if(Math.abs(hb - System.currentTimeMillis()) > HEARTBEAT_TO)
+                    {
+                        // Client node is down
+                        Generator generator = clusterNodes.get(n).generator;
+                        Log.e("PrimeNumManger", "ERROR: Client Node Down: " +
+                                clusterNodes.get(n).getClusterConnect().nodeProperties.hash);
+
+                        // Find an available node
+                        for(int u = 0; u < clusterNodes.size(); u++)
+                        {
+                            long uhb = clusterNodes.get(u).getLastHeartbeat();
+
+                            if(clusterNodes.get(u).isTaskComplete() == true &&
+                                    Math.abs(uhb - System.currentTimeMillis()) < HEARTBEAT_TO )
+                            {
+                                // Re-issue task
+                                clusterNodes.get(u).setTaskComplete(false);
+                                clusterNodes.get(u).generator = generator;
+                                clusterNodes.get(u).getClusterConnect().write(generator);
+                                Log.e("PrimeNumManger", "Re-Issued Task: " +
+                                        clusterNodes.get(u).getClusterConnect().nodeProperties.hash);
+                                break;
+                            }
+                        }
+
+                        // Remove from list
+                        // clusterNodes.remove(n);
+                    }
+                }
+            }while (!taskComplete);
         }
     }
 }

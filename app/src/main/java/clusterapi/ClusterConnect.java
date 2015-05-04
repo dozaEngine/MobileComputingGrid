@@ -50,7 +50,7 @@ public class ClusterConnect implements Runnable  {
             taskManager = new TaskManager(handler, oStream);
 
             //TODO: Investigate Buffer Size: Potential Memory Issues
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[2048];
             int bytes;
 
             Log.d(TAG,"Sending Handle");
@@ -88,7 +88,7 @@ public class ClusterConnect implements Runnable  {
                         taskManager.completedObj(object);
                     }
 
-                } catch (ClassNotFoundException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -110,14 +110,4 @@ public class ClusterConnect implements Runnable  {
             taskManager.scheduleObj(obj);
             Log.e(TAG, "Completed writing to queue.");
     }
-
-    /* Byte Stream Implementation */
-    public void write(byte[] buffer) {
-        try {
-            oStream.write(buffer);
-        } catch (IOException e) {
-            Log.e(TAG, "Exception during write", e);
-        }
-    }
-
 }

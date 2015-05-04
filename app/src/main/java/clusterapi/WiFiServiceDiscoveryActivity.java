@@ -444,7 +444,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
             }
         } else {
             Log.d(TAG, "Connected as peer");
-
+            groupOwner = false;
             //if(socketThread == null)
                 socketThread = new ClientSocketHandler(this.handler, p2pInfo.groupOwnerAddress, nodeProperties);
 

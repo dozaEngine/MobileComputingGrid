@@ -29,7 +29,7 @@ public class ClientSocketHandler extends Thread {
         try {
             socket.bind(null);
             socket.connect(new InetSocketAddress(mAddress.getHostAddress(),
-                    WiFiServiceDiscoveryActivity.SERVER_PORT), 10000);
+                    WiFiServiceDiscoveryActivity.SERVER_PORT), 1000000);
             Log.d(TAG, "Launching the I/O handler");
             clusterRunnable = new ClusterConnect(socket, handler, nodeProperties);
             new Thread(clusterRunnable).start();
