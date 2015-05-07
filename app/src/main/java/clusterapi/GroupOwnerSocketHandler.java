@@ -60,16 +60,13 @@ public class GroupOwnerSocketHandler extends Thread {
                 pool.execute(new ClusterConnect(clients.getLast(), handler, null));
                 Log.d(TAG, "Launching the I/O handler");
 
-            } catch (Exception e) {
-                try {
-                    if (socket != null && !socket.isClosed())
-                        socket.close();
-                } catch (IOException ioe) {
-                    Log.d(TAG, "Unhandled exception.");
-                }
+            } catch (IOException e) {
+                    //if (socket != null && !socket.isClosed())
+                        //socket.close();
+                Log.e(TAG, "Unhandled exception.?!?!");
+
                 e.printStackTrace();
-                pool.shutdownNow();
-                break;
+                //pool.shutdownNow();
             }
         }
     }

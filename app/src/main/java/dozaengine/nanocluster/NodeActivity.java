@@ -41,7 +41,7 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
             case MESSAGE_READ:
                 Generator generator = (Generator) msg.obj;
                 if(groupOwner) {
-                    if(primeNumManager != null) {
+                    if(primeNumManager != null && !primeNumManager.isTaskComplete()) {
                     Log.d(TAG, "Received Results");
                     primeNumManager.primeNumberCount += generator.readPrimeCount();
                     TotalPrimeNumCount = primeNumManager.primeNumberCount;
@@ -95,9 +95,11 @@ public class NodeActivity extends WiFiServiceDiscoveryActivity {
                     if(numberOfTasks >= numberOfCores){
                         Generator result = new Generator(primeNumManager.aNum,primeNumManager.bNum);
                         result.setPrimes(TotalPrimeNumCount);
+                        result.setCompTime(((Generator) msg.obj).readCompTime());
                         primeNumManager.sendClusterComplete(result);
                         numberOfTasks = 0;
                         TotalPrimeNumCount = 0;
+                        TotalComputationTime = 0;
                     }
                 }
                 break;

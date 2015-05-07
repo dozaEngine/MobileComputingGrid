@@ -67,9 +67,7 @@ public class ClusterConnect implements Runnable  {
                 try {
                     // Read from the InputStream
                     bytes = iStream.read(buffer);
-                    if (bytes == -1) {
-                        break;
-                    }
+                    if(bytes == -1) continue;
 
                     Object object = serializer.deserialize(buffer);
                     Log.e(TAG, "Received Object!");
@@ -88,19 +86,14 @@ public class ClusterConnect implements Runnable  {
                         taskManager.completedObj(object);
                     }
 
-                } catch (Exception e) {
+                } catch (IOException e) {
                     e.printStackTrace();
+                    Log.e(TAG, ">> Socket Read Timed-out <<", e);
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.e(TAG, ">> Disconnected <<", e);
             e.printStackTrace();
-        } finally {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 

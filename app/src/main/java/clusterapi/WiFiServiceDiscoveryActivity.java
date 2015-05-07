@@ -63,12 +63,12 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
     public static final int MY_HANDLE = 0x400 + 2;
     public static final int CLIENT_TASK_COMPLETE = 0x400 + 3;
     public static final int HEARTBEAT = 0x400 + 4;
-    private WifiP2pManager manager;
+    private WifiP2pManager wifiP2pManager;
 
     static final int SERVER_PORT = 4545;
 
     private final IntentFilter intentFilter = new IntentFilter();
-    private Channel channel;
+    private Channel wifiDirectChannel;
     private BroadcastReceiver receiver = null;
     private WifiP2pDnsSdServiceRequest serviceRequest;
 
@@ -91,6 +91,19 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
      * @return The number of cores, or 1 if failed to get result
      */
     private int getNumCores() { return Runtime.getRuntime().availableProcessors(); }
+
+    private void initializeWiFiDirect() {
+        wifiP2pManager =
+                (WifiP2pManager)getSystemService(Context.WIFI_P2P_SERVICE);
+
+        wifiDirectChannel = wifiP2pManager.initialize(this, getMainLooper(),
+                new WifiP2pManager.ChannelListener() {
+                    public void onChannelDisconnected() {
+                        initializeWiFiDirect();
+                    }
+                }
+        );
+    }
 
     /** Called when the activity is first created. */
     @Override
@@ -115,8 +128,8 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
         nodeProperties = new NodeProperties(maxCpuFreq,getNumCores(),batteryLife);
         nodeProperties.setHash(((Object)nodeProperties).hashCode());
 
-        manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
-        channel = manager.initialize(this, getMainLooper(), null);
+        initializeWiFiDirect();
+
         startRegistrationAndDiscovery();
 
         servicesList = new WiFiDirectServicesList();
@@ -225,8 +238,8 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
     @Override
     protected void onStop() {
         Log.d(TAG,"onStop > Entry");
-        if (manager != null && channel != null) {
-            manager.removeGroup(channel, new ActionListener() {
+        if (wifiP2pManager != null && wifiDirectChannel != null) {
+            wifiP2pManager.removeGroup(wifiDirectChannel, new ActionListener() {
 
                 @Override
                 public void onFailure(int reasonCode) {
@@ -253,7 +266,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
 
         WifiP2pDnsSdServiceInfo service = WifiP2pDnsSdServiceInfo.newInstance(
                 SERVICE_INSTANCE, SERVICE_REG_TYPE, record);
-        manager.addLocalService(channel, service, new ActionListener() {
+        wifiP2pManager.addLocalService(wifiDirectChannel, service, new ActionListener() {
 
             @Override
             public void onSuccess() {
@@ -278,7 +291,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
          * Register listeners for DNS-SD services. These are callbacks invoked
          * by the system when a service is actually discovered.
          */
-        manager.setDnsSdResponseListeners(channel,
+        wifiP2pManager.setDnsSdResponseListeners(wifiDirectChannel,
                 new DnsSdServiceResponseListener() {
 
                     @Override
@@ -328,7 +341,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
         // After attaching listeners, create a service request and initiate
         // discovery.
         serviceRequest = WifiP2pDnsSdServiceRequest.newInstance();
-        manager.addServiceRequest(channel, serviceRequest,
+        wifiP2pManager.addServiceRequest(wifiDirectChannel, serviceRequest,
                 new ActionListener() {
 
                     @Override
@@ -342,7 +355,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
                     }
                 });
 
-        manager.discoverServices(channel, new ActionListener() {
+        wifiP2pManager.discoverServices(wifiDirectChannel, new ActionListener() {
 
             @Override
             public void onSuccess() {
@@ -362,7 +375,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
         config.wps.setup = WpsInfo.PBC;
 
         if (serviceRequest != null)
-            manager.removeServiceRequest(channel, serviceRequest,
+            wifiP2pManager.removeServiceRequest(wifiDirectChannel, serviceRequest,
                     new ActionListener() {
 
                         @Override
@@ -374,7 +387,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
                         }
                     });
 
-        manager.connect(channel, config, new ActionListener() {
+        wifiP2pManager.connect(wifiDirectChannel, config, new ActionListener() {
 
             @Override
             public void onSuccess() {
@@ -399,7 +412,7 @@ public class WiFiServiceDiscoveryActivity extends Activity implements Handler.Ca
     public void onResume() {
         Log.d(TAG,"onResume > Entry");
         super.onResume();
-        receiver = new WiFiDirectBroadcastReceiver(manager, channel, this);
+        receiver = new WiFiDirectBroadcastReceiver(wifiP2pManager, wifiDirectChannel, this);
         registerReceiver(receiver, intentFilter);
         Log.d(TAG,"onResume > Exit");
     }

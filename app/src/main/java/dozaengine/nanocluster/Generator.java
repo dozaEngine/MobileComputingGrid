@@ -85,4 +85,6 @@ public class Generator implements Serializable {
 
     public void setPrimes(long _primes) {count = (int)_primes;}
 
+    public void setCompTime(long _time) {compTime = _time;}
+
 }

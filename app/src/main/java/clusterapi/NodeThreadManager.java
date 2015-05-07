@@ -1,9 +1,7 @@
 package clusterapi;
 
 import android.app.Fragment;
-import android.os.AsyncTask;
 import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 
 import java.util.concurrent.BlockingQueue;
@@ -22,7 +20,7 @@ public class NodeThreadManager extends Fragment {
     // Sets the Time Unit to seconds
     private static final TimeUnit KEEP_ALIVE_TIME_UNIT = TimeUnit.SECONDS;
 
-    public final int HEARTBEAT_TO = 1500; // 1.5 seconds
+    public final int HEARTBEAT_TO = 1500; // 1.5 seconds time-out (TO)
 
     public Handler handle = null;
 
@@ -69,10 +67,13 @@ public class NodeThreadManager extends Fragment {
     public void startHeartbeat()
     {
         Log.e("NodeThreadManager"," >>> Starting Heartbeat <<<");
-        (new Heartbeat(clusterConnect)).execute(100000); // TODO - make dynamic setting
+        Thread heartbeat = new Thread(new Heartbeat(clusterConnect));
+        heartbeat.setPriority(Thread.MAX_PRIORITY);
+        heartbeat.start();
     }
 
-    private class Heartbeat extends AsyncTask<Integer, Integer, Long> {
+    // TODO - Make into High Priority Thread
+    private class Heartbeat implements Runnable {
 
         private ClusterConnect m_clusterConnect;
 
@@ -80,29 +81,25 @@ public class NodeThreadManager extends Fragment {
             m_clusterConnect = clusterConnectIn;
         }
 
-        protected Long doInBackground(Integer ... duration) {
-            long totalSize = 0;
-            for (int i = 0; i < duration[0]; i++) {
+        @Override
+        public void run() {
+            // TODO - make dynamic setting - loop count
+            for (int i = 0; i < 100000; i++) {
 
                 if(m_clusterConnect != null)
-                    publishProgress((int) ((i / duration[0]) * 100));
+                    m_clusterConnect.write(m_clusterConnect.nodeProperties);
 
                 // Escape early if cancel() is called
-                if (isCancelled()) break;
+                if (Thread.interrupted()) break;
 
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                    break;
                 }
             }
-            return totalSize;
         }
-
-        protected void onProgressUpdate(Integer... progress) {
-            m_clusterConnect.write(m_clusterConnect.nodeProperties);
-        }
-
     }
 
 }

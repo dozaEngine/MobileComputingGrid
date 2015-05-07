@@ -1,9 +1,7 @@
 
 package dozaengine.nanocluster;
 
-import android.app.Fragment;
 import android.content.Context;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -17,10 +15,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-
 import clusterapi.ClusterConnect;
 import clusterapi.NodeThreadManager;
-import clusterapi.TaskManager;
 
 /**
  * This fragment handles chat related UI which includes a list view for messages
@@ -28,18 +24,22 @@ import clusterapi.TaskManager;
  */
 public class PrimeNumManager extends NodeThreadManager {
 
-    private boolean multithreaded = true;
+    private boolean multithreaded = false;
     private boolean taskComplete = true;
 
     private String TAG = "PrimeNumManager";
 
     final private long PRIMES100K = 9592;
+    final private long PRIMES200K = 17984;
     final private long PRIMESHALFMIL = 41538;
     final private long PRIMES1MIL = 78498;
     final private long HUNDREDK = 100000;
+    final private long TWOHUNK = 200000;
     final private long HALFMIL = 500000;
     final private long ONEMIL = 1000000;
     private long PRIMES = PRIMES100K;
+    private long finalNum = HUNDREDK;
+
 
     private View view;
     private TextView chatLine;
@@ -53,7 +53,6 @@ public class PrimeNumManager extends NodeThreadManager {
     long timeStart,totalTime;
 
     long primeNumberCount = 0;
-    private long finalNum = 100000;
     public int bNum = 0, aNum = 1;
     boolean notSorted = true;
 
@@ -86,6 +85,12 @@ public class PrimeNumManager extends NodeThreadManager {
                             PRIMES = PRIMESHALFMIL;
                             finalNum = HALFMIL;
                             chatLine.setText("Set to search to Half Million.");
+                        }
+                        else if(taskLead && chatLine.getText().toString().equalsIgnoreCase("200K"))
+                        {
+                            PRIMES = PRIMES200K;
+                            finalNum = TWOHUNK;
+                            chatLine.setText("Set to search to Two Hundred Thousand.");
                         }
                         else if(taskLead && chatLine.getText().toString().equalsIgnoreCase("100K"))
                         {
@@ -160,18 +165,20 @@ public class PrimeNumManager extends NodeThreadManager {
                              *  Start task monitor
                              * */
                             Log.e("PrimeNumManager", "Starting Task Monitor");
-                            new Thread(new TaskMonitor()).start();
+                            Thread taskMonitor = new Thread(new TaskMonitor());
+                            taskMonitor.setPriority(Thread.MAX_PRIORITY);
+                            taskMonitor.start();
 
                         }else if (clusterConnect != null) {
                             Log.d(getTag(), "peer");
 
                             // TODO: Remove: Using for Debug
-                            if(chatLine.getText().toString().equalsIgnoreCase("single"))
+                            if(chatLine.getText().toString().equalsIgnoreCase("s"))
                             {
                                 multithreaded = false;
                                 chatLine.setText("Set to Single Threaded.");
                             }
-                            else if(chatLine.getText().toString().equalsIgnoreCase("multi"))
+                            else if(chatLine.getText().toString().equalsIgnoreCase("m"))
                             {
                                 multithreaded = true;
                                 chatLine.setText("Set to Multi Threaded.");
@@ -206,6 +213,8 @@ public class PrimeNumManager extends NodeThreadManager {
             }
         }
     }
+
+    public boolean isTaskComplete() {return taskComplete;}
 
     public boolean checkComplete()
     {
@@ -440,8 +449,9 @@ public class PrimeNumManager extends NodeThreadManager {
                             }
                         }
 
-                        // Remove from list
-                        // clusterNodes.remove(n);
+                        // TODO - Enable remove from list
+                        //if(Math.abs(hb - System.currentTimeMillis()) > HEARTBEAT_TO*10)
+                        //    clusterNodes.remove(n);
                     }
                 }
             }while (!taskComplete);

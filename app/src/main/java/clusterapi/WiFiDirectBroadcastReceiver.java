@@ -58,7 +58,7 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-        Log.d(WiFiServiceDiscoveryActivity.TAG, action);
+        Log.d("WiFiDirectBroadcastReceiver", action);
         if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
 
             // UI update to indicate wifi p2p status.
@@ -72,27 +72,27 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
                 Log.d(WiFiServiceDiscoveryActivity.TAG, "Wifi Direct Mode: Disabled");
                 // TODO: activity.resetData();
             }
-            Log.d(WiFiServiceDiscoveryActivity.TAG, "P2P state changed : " + state);
+            Log.d("WiFiDirectBroadcastReceiver", "P2P state changed : " + state);
         } else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
-            Log.d(WiFiServiceDiscoveryActivity.TAG, "WIFI P2P Connection Change Action");
+            Log.d("WiFiDirectBroadcastReceiver", "WIFI P2P Connection Change Action");
             if (manager == null) {
                 return;
             }
 
-            Log.d(WiFiServiceDiscoveryActivity.TAG, "Getting Network Info");
+            Log.d("WiFiDirectBroadcastReceiver", "Getting Network Info");
             NetworkInfo networkInfo = (NetworkInfo) intent
                     .getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
             if (networkInfo.isConnected()) {
                 // we are connected with the other device, request connection
                 // info to find group owner IP
-                Log.d(WiFiServiceDiscoveryActivity.TAG,
+                Log.d("WiFiDirectBroadcastReceiver",
                         "Connected to p2p network. Requesting network details");
                 manager.requestConnectionInfo(channel,
                         (ConnectionInfoListener) activity);
             } else {
                 // It's a disconnect
-                Log.d(WiFiServiceDiscoveryActivity.TAG,
+                Log.d("WiFiDirectBroadcastReceiver",
                         "Disconnected to p2p network.");
             }
         } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION
@@ -100,7 +100,7 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
 
             WifiP2pDevice device = (WifiP2pDevice) intent
                     .getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE);
-            Log.d(WiFiServiceDiscoveryActivity.TAG, "Device status :" + device.status);
+            Log.d("WiFiDirectBroadcastReceiver", "Device status :" + device.status);
 
         }
     }
