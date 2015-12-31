@@ -19,6 +19,7 @@ public class Generator implements Serializable {
 
     public Generator(int _min, int _max){
 
+        // Validate and Initialize Generator 
         if(_min >= _max) {
             this.min = 0;
             this.max = 0;
@@ -43,6 +44,8 @@ public class Generator implements Serializable {
 
             // check to see if the number is prime
             for (int j = 2; j < i; j++) {
+                
+                // simple primality check
                 if (i % j == 0) {
                     isPrimeNumber = false;
                     break; // exit the inner for loop
@@ -50,12 +53,14 @@ public class Generator implements Serializable {
             }
 
             // TODO: Packetize Prime Number List
+            // Count prime numbers
             if (isPrimeNumber) {
                 ++count;
             }
 
         }
 
+        // Log final count and total computation time
         if(result != null) {
             result.append(count);
             compTime = System.currentTimeMillis() - t;
