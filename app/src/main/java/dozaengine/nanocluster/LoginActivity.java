@@ -35,6 +35,7 @@ public class LoginActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(dozaengine.nanocluster.R.layout.activity_login);
 
+        // Security login objects
         mPin = (EditText) findViewById(dozaengine.nanocluster.R.id.pin_input);
         mAutokey =(TextView) findViewById(dozaengine.nanocluster.R.id.passcode_key);
         mPasscode = (EditText) findViewById(dozaengine.nanocluster.R.id.passcode_input);
@@ -63,7 +64,8 @@ public class LoginActivity extends Activity {
 
                     random = new Random(Calendar.getInstance().getTimeInMillis());
 
-                    /* Secret Passcode Function */
+                    /* Function based security */
+                    // The user must know the global secret equation for login
                     Long autokey = Math.abs(random.nextLong() % 100);
                     mAutokey.setText(autokey.toString());
                 } else {
